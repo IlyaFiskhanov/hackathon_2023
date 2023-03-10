@@ -3,33 +3,33 @@ import cv2
 import hashlib
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
-
-
+"""
+    Функция compare_hashsum_image сравнивает хэш-сумму, введенную пользователем, с хэш-суммой файла, вычисленной с помощью функции 
+"""
 def compare_hashsum_video(filename):
     # Запросить у пользователя ввод хэш-суммы файла
     user_hashsum = input("Введите хэш-сумму файла: ")
-
     # Вычислить хэш-сумму файла
     file_hashsum = calculate_video_hash(filename)
-
     # Сравнить значения хэш-сумм
     if user_hashsum == file_hashsum:
         print("Хэш-суммы совпадают, файл не изменен")
     else:
         print("Хэш-суммы не совпадают, файл изменен")
-
-def get_signature_video(signature_filename=None):
-    """
+"""
     Запрашивает у пользователя ввод названия файла signature_image.txt,
     если signature_filename равно None. Если файл не существует, создает его.
-    """
+"""
+def get_signature_video(signature_filename=None):
+   
     if signature_filename is None:
         signature_filename = input("Введите название файла для цифровой подписи (например, signature_image.txt): ")
     if signature_filename is not None and not os.path.isfile(signature_filename):
         open(signature_filename, 'w').close()
     return signature_filename
-
-
+"""
+    Функция calculate_image_hash_print(filename) вычисляет хэш-сумму заданного файла filename
+"""
 def calculate_video_hash_print(filename):
     """
     Вычисление хэш-суммы видео-файла
@@ -41,9 +41,24 @@ def calculate_video_hash_print(filename):
             if not chunk:
                 break
             hash.update(chunk)
-    print("Хэш-сумма видео:", hash.hexdigest())
-    return hash.hexdigest()
+    print("Хэш-сумма изображения: ", hash.hexdigest())
 
+    # Спрашиваем у пользователя, нужно ли сохранить хэш-сумму в файл
+    save_to_file = input("Хотите сохранить хэш-сумму в файл? (1/0)").lower()
+
+    if save_to_file == "1":
+        # Запрашиваем у пользователя имя файла для сохранения хэш-суммы
+        output_filename = input("Введите имя файла для сохранения хэш-суммы: ")
+        with open(output_filename, 'w') as f:
+            f.write(hash.hexdigest())
+            print(f"Хэш-сумма сохранена в файл {output_filename}")
+    elif save_to_file != "0":
+        print("Хэш-сумма не будет сохранена в файл.")
+
+    return hash.hexdigest()
+"""
+    Расчет хэш-сумму файла
+"""
 def calculate_video_hash(filename):
     """
     Вычисление хэш-суммы видео-файла
@@ -56,13 +71,12 @@ def calculate_video_hash(filename):
                 break
             hash.update(chunk)
     return hash.hexdigest()
-
-def sign_video(filename, private_key,signature_filename=None):
-    """
+"""
     Создание цифровой подписи файла
-    """
-    signature_filename = get_signature_video(signature_filename)
+"""
+def sign_video(filename, private_key,signature_filename=None):
 
+    signature_filename = get_signature_video(signature_filename)
     signature = calculate_video_hash(filename)
     with open(filename, 'rb') as f:
         data = f.read()
@@ -77,17 +91,29 @@ def sign_video(filename, private_key,signature_filename=None):
     with open(signature_filename, 'wb') as f:
         f.write(signature)
     return signature
-
-
-def verify_video(filename, signature_filename, public_key, expected_hashsum):
-    """
+"""
     Проверка подлинности цифровой подписи и хэш-суммы файла
-    """
+"""
+def verify_video(filename, signature_filename, public_key, expected_hashsum=None):
+    
     with open(signature_filename, 'rb') as f:
         signature = f.read()
-    hashsum = calculate_video_hash(filename)
+    
+    # Запрашиваем у пользователя ввод хэш-суммы из файла или вручную
+    hash_input = input("Введите имя файла с хэш-суммой или введите хэш-сумму вручную: ").strip()
+
+    # Проверяем, является ли введенное значение именем файла
+    if os.path.isfile(hash_input):
+        with open(hash_input, 'r') as f:
+            hashsum = f.read().strip()
+    else:
+        hashsum = hash_input
+    
+    # Вычисляем хэш-сумму файла
+    actual_hashsum = calculate_video_hash(filename)
     with open(filename, 'rb') as f:
         data = f.read()
+    
     try:
         public_key.verify(
             signature,
@@ -98,18 +124,18 @@ def verify_video(filename, signature_filename, public_key, expected_hashsum):
             ),
             hashes.SHA256()
         )
-        if hashsum == expected_hashsum:
+        if hashsum == actual_hashsum:
             print("Файл оригинальный и подпись подлинна")
         else:
             print("Файл был изменен")
     except:
         print('Цифровая подпись недействительна')
 
-
-def mark_video(video_filename, watermark_filename, output_filename, private_key):
-    """
+"""
     Наложение водяного знака на видео и создание цифровой подписи
-    """
+"""
+def mark_video(video_filename, watermark_filename, output_filename, private_key):
+    
     # Загрузка видео и водяного знака
     video = cv2.VideoCapture(video_filename)
     watermark = cv2.imread(watermark_filename)
@@ -142,7 +168,4 @@ def mark_video(video_filename, watermark_filename, output_filename, private_key)
     # Создание цифровой подписи для изображения с водяным знаком
     signature = sign_video(output_filename, private_key)
 
-    # Сохранение цифровой подписи в файл
-    with open(output_filename[:-4]+'_signature.txt', 'wb') as f:
-        f.write(signature)
     return i, private_key
